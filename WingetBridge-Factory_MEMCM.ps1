@@ -1,6 +1,6 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.1, Nov 14, 2021
+# ScriptVersion:   v1.0.2, Nov 14, 2021
 # Description:     WingetBridge Factory for MEMCM
 # Compatibility:   MSI, NULLSOFT
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory  - to get the latest version of this script and see all requirements for the initial setup
@@ -16,7 +16,7 @@
     $CMApplicationFolder = ""                                                                  # Specify a folder in MEMCM where to move newly created applications (e.g. LAB:\WingetBridgeFactory") If you leave this empty, it will be stored in the root-folder
 
     # "WingetBridge Factory" configuration
-    $Global:ScriptPath = "C:\Applications\WingetBridgeFactory"                                 # Does not need to be configured manually (by default, the root directory of this script will be use)
+    $Global:ScriptPath = $null                                                                 # Does not need to be configured manually (by default, the root directory of this script will be use)
     $Global:TempDirectory = "[SCRIPTDIR]\tmp"                                                  # Temp-directory for this script, Warning: LessMSI does not support spaces in TempDirectory for unknown reasons
     $Global:7z15Beta_exe = "[SCRIPTDIR]\bin\7z1505\7z.exe"                                     # Please download "7-Zip v15.05 beta" from https://sourceforge.net/projects/sevenzip/files/7-Zip/15.05/ (Warning: It has to be version "15.05 beta", as newer versions do not decode NSIS!)
     $Global:LessMSI_exe = "[SCRIPTDIR]\bin\lessmsi\lessmsi.exe"                                # Please download "LessMSI" from https://github.com/activescott/lessmsi/releases
@@ -360,7 +360,7 @@ param (
         if ($ScriptDir -eq $null) { $ScriptDir = (Get-Location -PSProvider FileSystem).Path }
     } else { $ScriptDir = $Global:ScriptPath }
 
-    Write-Host "ScriptDir = $ScriptDir"
+    Write-Host "[SCRIPTDIR] is configured to [$ScriptDir]" -ForegroundColor Gray
 
     # Load ConfigMgr Module
     if((Get-Module ConfigurationManager) -eq $null) {
