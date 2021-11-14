@@ -1,6 +1,6 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.0, Nov 14, 2021
+# ScriptVersion:   v1.0.1, Nov 14, 2021
 # Description:     WingetBridge Factory for MEMCM
 # Compatibility:   MSI, NULLSOFT
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory  - to get the latest version of this script and see all requirements for the initial setup
@@ -190,7 +190,7 @@ param (
                                             }
                                         }                            
 
-                                        Cleanup-WingetBridgeFactory -TempDirectory $Global:TempDirectory #Now that we have the icon, we can delete the temporary files                                        
+                                        Remove-WingetBridgeFactoryTempFiles -TempDirectory $Global:TempDirectory #Now that we have the icon, we can delete the temporary files                                        
 
                                         if ($installerType -eq "nullsoft")
                                         {

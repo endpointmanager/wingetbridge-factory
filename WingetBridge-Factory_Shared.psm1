@@ -1,6 +1,6 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.0, Nov 14, 2021
+# ScriptVersion:   v1.0.1, Nov 14, 2021
 # Description:     WingetBridge Factory - Shared functions
 # Compatibility:   MSI, NULLSOFT
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory
@@ -121,7 +121,7 @@ param (
     }
 }
 
-function Split-InstructionLine #Helper-function for Get-InstallerDetailsFor...
+function Get-PartOfInstructionLine #Helper-function for Get-InstallerDetailsFor...
 {
 param (
     [string] $Instruction
@@ -252,7 +252,7 @@ function Get-WindowsInstallerTableData {
 	}
 
 
-function Grab-ShortcutIcon
+function Get-WingetBridgeIcon
 {
 param (
     [string[]]$ExeShortCuts,
@@ -420,7 +420,7 @@ param (
             $binariesInMsi = Get-WindowsInstallerTableData -MsiDbPath $InstallerFile -Table "Binary"
             $installerDetails['BinaryDataCount'] = $binariesInMsi.Count
 
-            $InstallerDetails = Grab-ShortcutIcon -InstallerDetails $InstallerDetails -InstallerType "msi" -CustomExtractor $CustomMsiLessSource -ExeShortCuts $ExeShortCuts
+            $InstallerDetails = Get-WingetBridgeIcon -InstallerDetails $InstallerDetails -InstallerType "msi" -CustomExtractor $CustomMsiLessSource -ExeShortCuts $ExeShortCuts
             return $InstallerDetails
         }
         else
@@ -477,11 +477,11 @@ param (
             #Get Variables
             for ( $i=0; $i -le ($array.length - 1); $i++) {
                 if ($array[$i].StartsWith('Name')) {
-                    $DisplayVersionArr = Split-InstructionLine -Instruction $array[$i].Trim()
+                    $DisplayVersionArr = Get-PartOfInstructionLine -Instruction $array[$i].Trim()
                     $installerDetails['Name'] = $DisplayVersionArr[1].Trim("`"") 
                 }
                 if ($array[$i].StartsWith('InstallDir ')) {
-                    $InstallDirArr = Split-InstructionLine -Instruction $array[$i].Trim()
+                    $InstallDirArr = Get-PartOfInstructionLine -Instruction $array[$i].Trim()
                     $installerDetails['InstallDir'] = $InstallDirArr[1].Trim("`"")                     
                 }
                 if ($array[$i].ToLower().StartsWith('page custom')) {
@@ -494,7 +494,7 @@ param (
                 if (($array[$i].Contains("Software\Microsoft\Windows\CurrentVersion\Uninstall")) -and
                 (($array[$i].Contains("WriteRegStr HKLM")) -or ($array[$i].Contains("WriteRegStr SHCTX")) -or
                 ($array[$i].Contains("WriteRegExpandStr HKLM")) -or ($array[$i].Contains("WriteRegExpandStr SHCTX")) )) { #SHCTX is HKLM if Shell-Context is Machine-based, otherwise it's HKCU which we are not targeting in this script
-                    $DisplayVersionArr = Split-InstructionLine -Instruction $array[$i].Trim()
+                    $DisplayVersionArr = Get-PartOfInstructionLine -Instruction $array[$i].Trim()
                     if ($DisplayVersionArr.Count -eq 5)
                     {
                         $ValueName = $DisplayVersionArr[3] #ValueName
@@ -533,7 +533,7 @@ param (
                 }
                 if ($array[$i].Contains("StrCpy `$INSTDIR")) #might be useful for custom x86/x64 Handlers
                 {
-                    $StrCpyArr = Split-InstructionLine -Instruction $array[$i].Trim()                    
+                    $StrCpyArr = Get-PartOfInstructionLine -Instruction $array[$i].Trim()                    
                     if ($StrCpyArr.Count -eq 3)
                     {
                         if ($StrCpyArr[2].Contains("`$PROGRAMFILES")) #only accept 1 of 3 ProgramFiles-Variables (neutral, 32, 64)
@@ -549,7 +549,7 @@ param (
             $shortcutsToIgnore = @("cmd.exe", "uninstall.exe", "iexplore.exe")
             for ( $i=0; $i -le ($array.length - 1); $i++) {
                 if (($array[$i].Contains("CreateShortCut ")) -and ($array[$i].Contains(".exe"))) {
-                    $DisplayVersionArr = Split-InstructionLine -Instruction $array[$i].Trim()                    
+                    $DisplayVersionArr = Get-PartOfInstructionLine -Instruction $array[$i].Trim()                    
                     if ($DisplayVersionArr[2].EndsWith(".exe") -and ($DisplayVersionArr[2].ToLower() -ne $UninstallExe.ToLower()))
                     {                        
                         $ExeFile = [io.path]::GetFileName($DisplayVersionArr[2])
@@ -568,7 +568,7 @@ param (
                 {
                     if ($installerDetails['UninstallString'] -eq "") #not set from "Software\Microsoft\Windows\CurrentVersion\Uninstall"
                     {
-                        $WriteUninstArr = Split-InstructionLine -Instruction $array[$i].Trim()
+                        $WriteUninstArr = Get-PartOfInstructionLine -Instruction $array[$i].Trim()
                         if ($WriteUninstArr.Count -gt 1)
                         {
                             $UninstallString = $WriteUninstArr[1]
@@ -580,7 +580,7 @@ param (
                     }
                 }
             }
-            $installerDetails = Grab-ShortcutIcon -InstallerDetails $InstallerDetails $InstallerType "nullsoft" -CustomExtractor $Custom7zSource -ExeShortCuts $ExeShortCuts
+            $installerDetails = Get-WingetBridgeIcon -InstallerDetails $InstallerDetails $InstallerType "nullsoft" -CustomExtractor $Custom7zSource -ExeShortCuts $ExeShortCuts
             return $installerDetails
         }
         else
@@ -590,7 +590,7 @@ param (
     }
 }
 
-function Cleanup-WingetBridgeFactory
+function Remove-WingetBridgeFactoryTempFiles
 {
 param (
     [string]$TempDirectory
