@@ -40,7 +40,19 @@ The function "New-CMWingetBridgePackage" is the main-function of the MEMCM asume
 
 Follow me on twitter and github to get notified about updates.
 
-# Initial Configuration
+# Initial setup
+* Download the WingetBridge-Factory-Repository as ZIP-File from [here](https://github.com/endpointmanager/wingetbridge-factory/archive/refs/heads/master.zip)
+* Extract the files under "C:\Applications\WingetBridgeFactory" (path can be customized)
+* Make sure you don't have any security-restrictions to load the Powershell-Module. If so, please remove any NTFS Alternate Data Streams (ADS) from the zip-file before you extract it, and set the ExecutionPolicy to Unrestricted
+
+    ```ps
+    Unblock-File .\wingetbridge-factory-master.zip  
+    Set-ExecutionPolicy -ExecutionPolicy Unrestricted
+    ```
+
+* Open the correct main-script (see "Available Scripts") and follow the instructions for the initial configuration.
+	
+## Initial Configuration
 In the initial setup, you specify a list of package-IDs you want to "synchronize" the latest available version into your software deployment tool.
 
 There are multiple ways to find PackageIDs within the winget repository:
@@ -75,7 +87,7 @@ The scripts in this repository, depends on several open source projects:
 * Configuration Manager Admin-Console needs to be installed (Script depends on ConfigurationManager.psd1)
 
 # Available Scripts
-WingetBridge-Factory_MEMCM.ps1  
+WingetBridge-Factory_MEMCM.ps1 (Mainscript for MEMCM, formerly ConfigMgr)  
 WingetBridge-Factory_Shared.psm1 - Module required by all other scripts (contains shared functions)
 
 ## Credits :heart:
