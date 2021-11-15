@@ -1,6 +1,6 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.3, Nov 14, 2021
+# ScriptVersion:   v1.0.4, Nov 15, 2021
 # Description:     WingetBridge Factory for MEMCM
 # Compatibility:   MSI, NULLSOFT
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory  - to get the latest version of this script and see all requirements for the initial setup
@@ -12,7 +12,7 @@
 
     # Specify whatever you want to "synchronize" (2900+ packages are available) - You can search for package ids by using [VideoLAN.VLC] or visit https://winstall.app    
     $WingetPackageIdsToSync = @( "VideoLAN.VLC", "TimKosse.FileZilla.Client" )
-    $ContentSource = "\\datastorage\Setups"                                                    # Content will be automatically downloaded to a new subdirectory like [ContentSource]\Publisher\Appname\Architecture\SomeInstaller.msi
+    $ContentSource = "\\MEMCM01\Setups"                                                        # Content will be automatically downloaded to a new subdirectory like [ContentSource]\Publisher\Appname\Architecture\SomeInstaller.msi
     $CMApplicationFolder = ""                                                                  # Specify a folder in MEMCM where to move newly created applications (e.g. LAB:\WingetBridgeFactory") If you leave this empty, it will be stored in the root-folder
 
     # "WingetBridge Factory" configuration
@@ -79,12 +79,12 @@ param (
             $CMApp = Get-CMApplication -Name "$AppName"
             if ($CMApp -ne $null)
             {
-                Write-Host "Version already exists" -ForegroundColor Green
+                Write-Host "$AppName already exists" -ForegroundColor Green
                 $AppCreationIsRequired = $false                
             }
             else
             {
-                Write-Host "App does not exist yet" -ForegroundColor Yellow
+                Write-Host "$AppName does not exist yet. We create it now..." -ForegroundColor Yellow
                 $keywords = Get-WingetBridgeKeywordsAsString -Tags $manifest.Tags -maxlength 64
 
                 if ($manifest.Description -eq $null)
@@ -100,7 +100,7 @@ param (
                 $PackageIdRootDir = "$PublisherRootDir\$($AppName.Trim("."))"
                 $IconResource = "$PublisherRootDir\$($manifest.PackageIdentifier.Trim(".")).ico"
 
-
+                $CreatedDTs = @()
                 foreach ($installer in $manifest.Installers)
                 {
                     $ExpectedScope = "machine"
@@ -123,12 +123,15 @@ param (
                             }
                         }    
 
-                        if (((($installer.Scope -eq $ExpectedScope) -or ($manifest.Scope -eq $ExpectedScope)) -or (($installer.Scope -eq $null) -and ($manifest.Scope -eq $null))) -and ($installer.Architecture -ne "arm64") -and ($installer.InstallerLocale -in $Global:InstallerLocale)) #ignore mobile platform (arm64)
+                        if (((($installer.Scope -eq $ExpectedScope) -or ($manifest.Scope -eq $ExpectedScope)) -or (($installer.Scope -eq $null) -and ($manifest.Scope -eq $null))) -and ($installer.Architecture -ne "arm64") -and (($manifest.InstallerLocale -in $Global:InstallerLocale) -or ($installer.InstallerLocale -in $Global:InstallerLocale))) #ignore mobile platform (arm64)
                         {
                             if ($testrun)
                             {
                                 $installerType = $installer.InstallerType
                                 if (($installerType -eq "") -or ($installerType -eq $null)) { $installerType = $manifest.InstallerType }
+
+                                $installerLocale = $installer.InstallerLocale
+                                if (($installerLocale -eq "") -or ($installerLocale -eq $null)) { $installerLocale = $manifest.InstallerLocale }
                     
                                 $Scope = $installer.Scope
                                 if (($Scope -eq "") -or ($Scope -eq $null)) { $Scope = $manifest.Scope }
@@ -141,7 +144,14 @@ param (
                                 if ($testrun -eq $false)
                                 {
                                     $SkipInstaller = $false
-                                    $DeploymentTypeName = "$AppName $($installer.Architecture) ($Scope, $installerType)"
+                                    if (($installerLocale -ne $null) -and ($installerLocale -ne ""))
+                                    {
+                                        $DeploymentTypeName = "$AppName $($installer.Architecture) ($Scope, $installerType, $installerLocale)"
+                                    }
+                                    else
+                                    {
+                                        $DeploymentTypeName = "$AppName $($installer.Architecture) ($Scope, $installerType)"
+                                    }
                                     Write-Host -ForegroundColor Magenta "Download $($installer.InstallerUrl)"
                                     $ContentSource = "$PackageIdRootDir\$($installer.Architecture)"
                                     $NewContentFolder = New-Item -ItemType Directory -Path "FileSystem::$ContentSource" -Force
@@ -187,10 +197,17 @@ param (
                                     }
                                     if ($SupportedPlatform -eq $null)
                                     {
-                                        Write-Host "Installer with no compatible architecture found!" -ForegroundColor Red
+                                        Write-Host "Skip installer, with unexpected architecture" -ForegroundColor Red
                                         $SkipInstaller = $true
                                     }
                                     $OSRequirements = $OperatingSystemCondition | New-CMRequirementRuleOperatingSystemValue -RuleOperator OneOf -Platform $SupportedPlatform
+
+                                    #Check if we already created an equivalent DT
+                                    if ($CreatedDTs -contains "$Scope_$($installer.Architecture)_$installerLocale")
+                                    {
+                                        Write-Host "Skip Installer, as we already created an equivalent DeploymentType (same Scope, Architecture and Localization)" -ForegroundColor Yellow
+                                        $SkipInstaller = $true
+                                    }
 
                                     if (!($SkipInstaller))
                                     {
@@ -221,7 +238,7 @@ param (
                                         {
                                             $InstallProgram = "msiexec /I `"$($downloadedInstaller.Filename)`" /Q"
                                             $UninstallProgram = "msiexec /X $($installerdetails.ProductCode) /Q"
-                                            $CMDeploymentType = Add-CMMsiDeploymentType -ApplicationName "$AppName" -DeploymentTypeName $DeploymentTypeName -ContentLocation "$ContentSource\$($downloadedInstaller.Filename)" -LogonRequirementType WhereOrNotUserLoggedOn -UninstallOption "NoneRequired" -InstallationBehaviorType InstallForSystem -UninstallCommand $UninstallProgram -AddRequirements $OSRequirements
+                                            $CMDeploymentType = Add-CMMsiDeploymentType -ApplicationName "$AppName" -DeploymentTypeName $DeploymentTypeName -ContentLocation "$ContentSource\$($downloadedInstaller.Filename)" -LogonRequirementType WhereOrNotUserLoggedOn -UninstallOption "NoneRequired" -InstallationBehaviorType InstallForSystem -UninstallCommand $UninstallProgram -AddRequirement $OSRequirements -UserInteractionMode Hidden
                                         }
 
                                         ###
@@ -310,6 +327,7 @@ param (
                                                 $SetDetection = Set-CMScriptDeploymentType -ApplicationName $AppName -DeploymentTypeName $DeploymentTypeName -UserInteractionMode Hidden -AddDetectionClause $DetectionClauses -AddRequirement $OSRequirements
                                             }
                                         } #NULLSOFT DEPLOYMENT TYPE
+                                        $CreatedDTs += "$Scope_$($installer.Architecture)_$installerLocale"  #Store what we already created in this package
                                     } #SkipInstaller
                                 }
                             }
@@ -357,7 +375,7 @@ param (
         if ($ScriptDir -eq $null) { $ScriptDir = (Get-Location -PSProvider FileSystem).Path }
     } else { $ScriptDir = $Global:ScriptPath }
 
-    Write-Host "[SCRIPTDIR] is configured to [$ScriptDir]" -ForegroundColor Gray
+    Write-Host "[SCRIPTDIR] is set to: `"$ScriptDir`"" -ForegroundColor Gray
 
     # Load ConfigMgr Module
     if((Get-Module ConfigurationManager) -eq $null) {
@@ -389,8 +407,11 @@ param (
     # Lets begin with the magic...
     foreach ($IdToSync in $WingetPackageIdsToSync)
     {
+        Write-Host "Search for `"$IdToSync`" in winget repository ..."
         $CreatedPackage = Start-WingetSearch -SearchById $IdToSync -MaxCacheAge $Global:MaxCacheAge | New-CMWingetBridgePackage -ContentSourceRootDir $ContentSource -CMAppFolder $CMApplicationFolder
-    }
+        Write-Host ""
+    }    
+    Write-Host "We are done! Thank you for using WingetBridge Factory!" -ForegroundColor Green
 
 #
 ## MAIN CODE ENDS HERE

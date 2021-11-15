@@ -1,13 +1,13 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.3, Nov 14, 2021
+# ScriptVersion:   v1.0.4, Nov 15, 2021
 # Description:     WingetBridge Factory - Shared functions
 # Compatibility:   MSI, NULLSOFT
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory
 #######
 
 #######
-# There is no configuration required within this script.
+# There is no configuration required in this script.
 #######
 
 function Get-PathFriendlyName
@@ -105,8 +105,7 @@ param (
         $iconBmp = [System.Drawing.Bitmap]::FromFile($SourceFile)
     }
     
-    $newbmp = New-Object -TypeName System.Drawing.Bitmap -ArgumentList $iconBmp, $Resolution, $Resolution
-    write-host "Resize image to $($Resolution) x $($Resolution)"
+    $newbmp = New-Object -TypeName System.Drawing.Bitmap -ArgumentList $iconBmp, $Resolution, $Resolution    
     
     $newbmp.Save($TargetFile, "png")
     $newbmp.Dispose()
@@ -261,54 +260,65 @@ param (
     [string]$CustomExtractor
 )
     $ExeWithIcon = ""
-    foreach ($exe in $ExeShortCuts) #Create Icon From Shortcuts
-    {                
-        $ExeWithIcon = $exe
+    $SuggestedIconExists = $false
+
+    foreach ($exe in $ExeShortCuts) #Search for suggested Icon
+    {
         if ($InstallerDetails.DisplayIcon.contains("\$exe"))
-        {                    
+        {
+            $SuggestedIconExists = $true
             break #Handle it like it is the "suggested" icon
         }
     }
-    if ($ExeWithIcon -ne "")
-    {
-        if ($InstallerType -eq "nullsoft")
+
+    foreach ($exe in $ExeShortCuts) #Create Icon From Shortcuts
+    {                
+        $ExeWithIcon = $exe   
+        if ($ExeWithIcon -ne "")
         {
-            $process = Start-Process -FilePath "$CustomExtractor" -ArgumentList @("e", "`"$InstallerFile`"", "-ir!$ExeWithIcon", "-o`"$($Global:TempDirectory)`"","-y") -WindowStyle Hidden -Wait -PassThru
-        }
-        if ($InstallerType -eq "msi")
-        {
-            Write-Host "Try to extract icon from `"$ExeWithIcon`"" -ForegroundColor Magenta
-            $process = Start-Process -FilePath "$CustomExtractor" -ArgumentList @("x", "`"$InstallerFile`"", "$($Global:TempDirectory)\","$ExeWithIcon") -WindowStyle Hidden -Wait -PassThru
-        }
-        if ($process.ExitCode -eq 0)
-        {
-            $extractedfiles = Get-ChildItem -Path $($Global:TempDirectory) -Filter $ExeWithIcon -Recurse
-            foreach ($file in $extractedfiles)
+            Write-Host "Try to extract icon from `"$ExeWithIcon`" with `"$CustomExtractor`" ($InstallerType)" -ForegroundColor Magenta
+            if ($InstallerType -eq "nullsoft")
             {
-                Move-Item -Path $file.FullName -Destination $($Global:TempDirectory) -Force
+                $process = Start-Process -FilePath "$CustomExtractor" -ArgumentList @("e", "`"$InstallerFile`"", "-ir!$ExeWithIcon", "-o`"$($Global:TempDirectory)`"","-y") -WindowStyle Hidden -Wait -PassThru
             }
-            $InstallerDetails.TemporaryIconFile = ("$($Global:TempDirectory)\$ExeWithIcon").Replace(".exe",".ico")
-            $InstallerDetails.FileDetectionVersion = ((Get-Item "$($Global:TempDirectory)\$ExeWithIcon").VersionInfo.FileVersion).Replace(", ", ".")
-            if (!(Test-Path -Path "FileSystem::$($InstallerDetails.TemporaryIconFile)"))
+            if ($InstallerType -eq "msi")
+            {            
+                $process = Start-Process -FilePath "$CustomExtractor" -ArgumentList @("x", "`"$InstallerFile`"", "$($Global:TempDirectory)\","$ExeWithIcon") -WindowStyle Hidden -Wait -PassThru
+            }
+            if ($process.ExitCode -eq 0)
             {
-                try
+                $extractedfiles = Get-ChildItem -Path $($Global:TempDirectory) -Filter $ExeWithIcon -Recurse
+                foreach ($file in $extractedfiles)
                 {
-                    $nouptput = Save-WingetBridgeAppIcon -SourceFile "$($Global:TempDirectory)\$ExeWithIcon" -TargetIconFile $InstallerDetails.TemporaryIconFile
+                    Move-Item -Path $file.FullName -Destination $($Global:TempDirectory) -Force
                 }
-                catch
+                $InstallerDetails.TemporaryIconFile = ("$($Global:TempDirectory)\$ExeWithIcon").Replace(".exe",".ico")
+                $InstallerDetails.FileDetectionVersion = ((Get-Item "$($Global:TempDirectory)\$ExeWithIcon").VersionInfo.FileVersion).Replace(", ", ".")
+                if (!(Test-Path -Path "FileSystem::$($InstallerDetails.TemporaryIconFile)"))
                 {
-                    Write-Host "We were not able to extract an icon from `"$($Global:TempDirectory)\$ExeWithIcon`"" -ForegroundColor Yellow
-                } #could be an executable that does not contain an icon
-            }
-            if (Test-Path -Path "FileSystem::$($InstallerDetails.TemporaryIconFile)")
+                    try
+                    {
+                        $nouptput = Save-WingetBridgeAppIcon -SourceFile "$($Global:TempDirectory)\$ExeWithIcon" -TargetIconFile $InstallerDetails.TemporaryIconFile
+                    }
+                    catch
+                    {
+                        Write-Host "We were not able to extract an icon from `"$($Global:TempDirectory)\$ExeWithIcon`"" -ForegroundColor Yellow
+                    } #could be an executable that does not contain an icon
+                }
+                if (Test-Path -Path "FileSystem::$($InstallerDetails.TemporaryIconFile)")
+                {
+                    $InstallerDetails.BestIconResolution = Get-BestIconResolution -SourceFile "$($Global:TempDirectory)\$ExeWithIcon"
+                    if (($InstallerDetails.DisplayIcon.contains("\$exe")) -or (!($SuggestedIconExists))) #this is the suggested icon (or there is no suggested icon)
+                    {
+                        break
+                    }
+                }
+            } else
             {
-                $InstallerDetails.BestIconResolution = Get-BestIconResolution -SourceFile "$($Global:TempDirectory)\$ExeWithIcon"
+                Write-Host "Failed to extract executable" -ForegroundColor Red
             }
-        } else
-        {
-            Write-Host "Failed to extract executable" -ForegroundColor Red
-        }
-    } else { Write-Host "no icon found" }
+        } else { Write-Host "no icon found" }
+    }
     return $InstallerDetails
 }
 
@@ -600,6 +610,6 @@ param (
         Remove-Item -Path "$TempDirectory\*.ico" -Filter "*.ico" -Force
         Remove-Item -Path "$TempDirectory\*.exe" -Filter "*.exe" -Force
         Remove-Item -Path "$TempDirectory\*.nsi" -Filter "*.nsi" -Force
-        Remove-Item -Path "$TempDirectory\*.nsi" -Filter "*.png" -Force
+        Remove-Item -Path "$TempDirectory\*.png" -Filter "*.png" -Force
     } catch {}
 }
