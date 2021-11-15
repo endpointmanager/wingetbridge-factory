@@ -1,6 +1,6 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.4, Nov 15, 2021
+# ScriptVersion:   v1.0.5, Nov 15, 2021
 # Description:     WingetBridge Factory for MEMCM
 # Compatibility:   MSI, NULLSOFT
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory  - to get the latest version of this script and see all requirements for the initial setup
