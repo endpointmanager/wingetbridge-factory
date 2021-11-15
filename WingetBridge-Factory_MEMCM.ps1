@@ -1,6 +1,6 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.2, Nov 14, 2021
+# ScriptVersion:   v1.0.3, Nov 14, 2021
 # Description:     WingetBridge Factory for MEMCM
 # Compatibility:   MSI, NULLSOFT
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory  - to get the latest version of this script and see all requirements for the initial setup
@@ -27,6 +27,7 @@
     $Global:AllowMSIWrappers = $false                         # Sometimes a legacy-setup is better than a MSI wrapping a legacy-installer
     $Global:InstallerLocale = @("en-US", "de-DE", $null)      # Some installers do not provide a locale (asume it is english or multilange), and some will overwrite already downloaded setups from a different locale (having the same filename)
     $Global:MaxCacheAge = 30                                  # By default wingetbridge caches winget repo for one day, you can specify a custom value in minutes
+    $Global:CleanupFiles = $true                              # Remove temporary files from WingetBridgeFactory TempDirectory as soon as we don not need them anymore
 
     # Site configuration
     $SiteCode = "LAB"                                         # Site code
@@ -140,7 +141,7 @@ param (
                                 if ($testrun -eq $false)
                                 {
                                     $SkipInstaller = $false
-                                    $DeploymentTypeName = "$AppName $($installer.Architecture) ($Scope)"
+                                    $DeploymentTypeName = "$AppName $($installer.Architecture) ($Scope, $installerType)"
                                     Write-Host -ForegroundColor Magenta "Download $($installer.InstallerUrl)"
                                     $ContentSource = "$PackageIdRootDir\$($installer.Architecture)"
                                     $NewContentFolder = New-Item -ItemType Directory -Path "FileSystem::$ContentSource" -Force
@@ -173,6 +174,24 @@ param (
                                         if (!($Global:AllowMSIWrappers)) { $SkipInstaller = $true }
                                     }
 
+                                    $SupportedPlatform = @()                   
+                                    if ($installer.Architecture -eq "x64")
+                                    {
+                                        $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(64-bit)*" | Where-Object PlatformType -eq 1
+                                        $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(64-bit)*" | Where-Object PlatformType -eq 1
+                                    }
+                                    if ($installer.Architecture -eq "x86")
+                                    {
+                                        $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(32-bit)*" | Where-Object PlatformType -eq 1
+                                        $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(32-bit)*" | Where-Object PlatformType -eq 1
+                                    }
+                                    if ($SupportedPlatform -eq $null)
+                                    {
+                                        Write-Host "Installer with no compatible architecture found!" -ForegroundColor Red
+                                        $SkipInstaller = $true
+                                    }
+                                    $OSRequirements = $OperatingSystemCondition | New-CMRequirementRuleOperatingSystemValue -RuleOperator OneOf -Platform $SupportedPlatform
+
                                     if (!($SkipInstaller))
                                     {
                                         if ($installerdetails.TemporaryIconFile -ne "") #Set the AppIcon
@@ -190,27 +209,27 @@ param (
                                             }
                                         }                            
 
-                                        Remove-WingetBridgeFactoryTempFiles -TempDirectory $Global:TempDirectory #Now that we have the icon, we can delete the temporary files                                        
-
-                                        if ($installerType -eq "nullsoft")
+                                        if ($Global:CleanupFiles)
                                         {
-                                            $InstallProgram = "`"$($downloadedInstaller.Filename)`" /S /allusers" #nullsoft installer (machine)
+                                            Remove-WingetBridgeFactoryTempFiles -TempDirectory $Global:TempDirectory #Now that we have the icon, we can delete the temporary files                                        
                                         }
+
+                                        ###
+                                        # Create MSI-DeploymentType (for MSI)
+                                        ##
                                         if ($installerType -eq "msi")
                                         {
                                             $InstallProgram = "msiexec /I `"$($downloadedInstaller.Filename)`" /Q"
-                                        }
-
-                                        if ($installerType -eq "msi")
-                                        {
-                                            $CMDeploymentType = Add-CMMsiDeploymentType -ApplicationName "$AppName" -DeploymentTypeName $DeploymentTypeName -ContentLocation "$ContentSource\$($downloadedInstaller.Filename)" -LogonRequirementType WhereOrNotUserLoggedOn -UninstallOption "NoneRequired" -InstallationBehaviorType InstallForSystem
+                                            $UninstallProgram = "msiexec /X $($installerdetails.ProductCode) /Q"
+                                            $CMDeploymentType = Add-CMMsiDeploymentType -ApplicationName "$AppName" -DeploymentTypeName $DeploymentTypeName -ContentLocation "$ContentSource\$($downloadedInstaller.Filename)" -LogonRequirementType WhereOrNotUserLoggedOn -UninstallOption "NoneRequired" -InstallationBehaviorType InstallForSystem -UninstallCommand $UninstallProgram -AddRequirements $OSRequirements
                                         }
 
                                         ###
-                                        # Create custom Detection Rules (for NULLSOFT)
-                                        ###
+                                        # Create Script-DeploymentType with Registry-Detection (for NULLSOFT)
+                                        ##
                                         if ($installerType -eq "nullsoft")
                                         {
+                                            $InstallProgram = "`"$($downloadedInstaller.Filename)`" /S /allusers" #nullsoft installer (machine)
                                             $RequiresWow6432 = $false
                                             if ($($installerdetails.UninstallString) -ne "")
                                             {
@@ -235,10 +254,6 @@ param (
                                             else #Could not detect a usefull uninstaller (needs to be specified manually)
                                             {
                                                 $UninstallProgram = ""
-                                                if ($installerType -eq "msi")
-                                                {
-                                                    $UninstallProgram = "msiexec /X $($installerdetails.ProductCode) /Q"
-                                                }
                                             }
 
                                             $CMDeploymentType = Add-CMScriptDeploymentType -ScriptLanguage VBScript -LogonRequirementType WhetherOrNotUserLoggedOn -ScriptText "option explicit" -ApplicationName "$AppName" -DeploymentTypeName $DeploymentTypeName -ContentLocation "$ContentSource" -UninstallOption "NoneRequired" -InstallationBehaviorType InstallForSystem -InstallCommand "$InstallProgram" -UninstallCommand $UninstallProgram                                           
@@ -285,32 +300,14 @@ param (
                                             Write-Host " Created Detection Method for Key: $DetectionRegKey Property: $DetectionRegKeyValueName Value: $SelectedVersion" -ForegroundColor Green
                                             Write-Host " Adding Detection Method to App" -ForegroundColor Green
 
-                                            $SupportedPlatform = $null                    
-                                            if ($installer.Architecture -eq "x64")
-                                            {
-                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(64-bit)*" | Where-Object PlatformType -eq 1
-                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(64-bit)*" | Where-Object PlatformType -eq 1
-                                            }
-                                            if ($installer.Architecture -eq "x86")
-                                            {
-                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(32-bit)*" | Where-Object PlatformType -eq 1
-                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(32-bit)*" | Where-Object PlatformType -eq 1
-                                            }
-                                            if ($SupportedPlatform -eq $null)
-                                            {
-                                                Write-Host "Installer with no compatible architecture found!" -ForegroundColor Red
-                                            }
-
-                                            $Requirements = $OperatingSystemCondition | New-CMRequirementRuleOperatingSystemValue -RuleOperator OneOf -Platform $SupportedPlatform
-
                                             $SetDetection = $null
                                             if ($DetectionClauses.count -gt 1){
                                                 #Include an $DetectionClauseConnector
-                                                $SetDetection = Set-CMScriptDeploymentType -ApplicationName $AppName -DeploymentTypeName $DeploymentTypeName -UserInteractionMode Hidden -AddDetectionClause $DetectionClauses -DetectionClauseConnector $DetectionClauseConnector -AddRequirement $Requirements
+                                                $SetDetection = Set-CMScriptDeploymentType -ApplicationName $AppName -DeploymentTypeName $DeploymentTypeName -UserInteractionMode Hidden -AddDetectionClause $DetectionClauses -DetectionClauseConnector $DetectionClauseConnector -AddRequirement $OSRequirements
                                             }
                                             else
                                             {
-                                                $SetDetection = Set-CMScriptDeploymentType -ApplicationName $AppName -DeploymentTypeName $DeploymentTypeName -UserInteractionMode Hidden -AddDetectionClause $DetectionClauses -AddRequirement $Requirements
+                                                $SetDetection = Set-CMScriptDeploymentType -ApplicationName $AppName -DeploymentTypeName $DeploymentTypeName -UserInteractionMode Hidden -AddDetectionClause $DetectionClauses -AddRequirement $OSRequirements
                                             }
                                         } #NULLSOFT DEPLOYMENT TYPE
                                     } #SkipInstaller

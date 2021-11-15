@@ -1,6 +1,6 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.1, Nov 14, 2021
+# ScriptVersion:   v1.0.3, Nov 14, 2021
 # Description:     WingetBridge Factory - Shared functions
 # Compatibility:   MSI, NULLSOFT
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory
@@ -321,7 +321,7 @@ param (
     $AuthenticodeSignature = $null
     try
     {
-        $AuthenticodeSignature = (Get-AuthenticodeSignature -FilePath $InstallerFile)
+        $AuthenticodeSignature = (Get-AuthenticodeSignature -FilePath "FileSystem::$InstallerFile")
     }
     catch {}
     if ($AuthenticodeSignature -ne $null) {
@@ -580,7 +580,7 @@ param (
                     }
                 }
             }
-            $installerDetails = Get-WingetBridgeIcon -InstallerDetails $InstallerDetails $InstallerType "nullsoft" -CustomExtractor $Custom7zSource -ExeShortCuts $ExeShortCuts
+            $installerDetails = Get-WingetBridgeIcon -InstallerDetails $InstallerDetails -InstallerType "nullsoft" -CustomExtractor $Custom7zSource -ExeShortCuts $ExeShortCuts
             return $installerDetails
         }
         else
@@ -600,5 +600,6 @@ param (
         Remove-Item -Path "$TempDirectory\*.ico" -Filter "*.ico" -Force
         Remove-Item -Path "$TempDirectory\*.exe" -Filter "*.exe" -Force
         Remove-Item -Path "$TempDirectory\*.nsi" -Filter "*.nsi" -Force
+        Remove-Item -Path "$TempDirectory\*.nsi" -Filter "*.png" -Force
     } catch {}
 }
