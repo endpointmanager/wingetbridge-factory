@@ -98,9 +98,10 @@ WingetBridge-Factory_Shared.psm1 - Module required by all other scripts (contain
 
 * The developers and contributors behind [Windows Package Manager](https://docs.microsoft.com/en-us/windows/package-manager/).
 * The developers and contributors behind [WIX Toolset](https://wixtoolset.org/)
+* The developers behind [innounp](http://innounp.sourceforge.net)
 * Igor Pavlov and the contributors of [7-Zip](https://www.7-zip.org/)
 * Scott Willeke and the contributors of [lessmsi](https://lessmsi.activescott.com/)
-* Everyone who is willing to use wingetbridge, so software vendors see how important it is to maintain their packages through the winget-repository.
+* Everyone who is willing to use wingetbridge, so software developers realize how important it is to maintain their packages through the winget-repository.
 
 ## License (does not include 3rd party software, which can be downloaded using this script)
 
