@@ -1,26 +1,35 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.5, Nov 15, 2021
+# ScriptVersion:   v1.0.6, Nov 17, 2021
 # Description:     WingetBridge Factory for MEMCM
-# Compatibility:   MSI, NULLSOFT
-# Please visit:    https://github.com/endpointmanager/wingetbridge-factory  - to get the latest version of this script and see all requirements for the initial setup
+# Compatibility:   MSI, NULLSOFT, INNO
+# Please visit:    https://github.com/endpointmanager/wingetbridge-factory  - to get the latest version
 #######
 
 #######
 # CONFIGURATION STARTS HERE
 ###
 
-    # Specify whatever you want to "synchronize" (2900+ packages are available) - You can search for package ids by using [VideoLAN.VLC] or visit https://winstall.app    
-    $WingetPackageIdsToSync = @( "VideoLAN.VLC", "TimKosse.FileZilla.Client" )
+    # Specify whatever you want to "synchronize" (2900+ packages are available) - You can search for package-IDs by using the [Start-WingetSearch]-cmdlet, or visit https://winstall.app
+    $WingetPackageIdsToSync = @( "Microsoft.VisualStudioCode", "VideoLAN.VLC" )
     $ContentSource = "\\MEMCM01\Setups"                                                        # Content will be automatically downloaded to a new subdirectory like [ContentSource]\Publisher\Appname\Architecture\SomeInstaller.msi
-    $CMApplicationFolder = ""                                                                  # Specify a folder in MEMCM where to move newly created applications (e.g. LAB:\WingetBridgeFactory") If you leave this empty, it will be stored in the root-folder
+    $CMApplicationFolder = ""                                                                  # Specify a folder in MEMCM where to move newly created applications (e.g. LAB:\WingetBridgeFactory") If you leave this empty, it will be stored in the root-folder    
+
+    # Custom install-parameters (optional)
+    $InstallParams = @{}
+    $InstallParams['Microsoft.VisualStudioCode'] = "/VERYSILENT /NORESTART /MERGETASKS=!runcode"           #This is just an example (for Microsoft.VisualStudioCode)
+    $InstallParams['Microsoft.VisualStudioCode.Insiders'] = "/VERYSILENT /NORESTART /MERGETASKS=!runcode"  #This is just an example (for Microsoft.VisualStudioCode.Insiders)
+
+    # Custom uninstall-parameters (optional)
+    $UninstallParams = @{}
 
     # "WingetBridge Factory" configuration
     $Global:ScriptPath = $null                                                                 # Does not need to be configured manually (by default, the root directory of this script will be use)
     $Global:TempDirectory = "[SCRIPTDIR]\tmp"                                                  # Temp-directory for this script, Warning: LessMSI does not support spaces in TempDirectory for unknown reasons
     $Global:7z15Beta_exe = "[SCRIPTDIR]\bin\7z1505\7z.exe"                                     # Please download "7-Zip v15.05 beta" from https://sourceforge.net/projects/sevenzip/files/7-Zip/15.05/ (Warning: It has to be version "15.05 beta", as newer versions do not decode NSIS!)
     $Global:LessMSI_exe = "[SCRIPTDIR]\bin\lessmsi\lessmsi.exe"                                # Please download "LessMSI" from https://github.com/activescott/lessmsi/releases
-    $Global:WindowsInstaller_dll = "[SCRIPTDIR]\bin\Microsoft.Deployment.WindowsInstaller.dll" # Please download "Wix Toolset" from https://wixtoolset.org/releases/ and specify the installation path (e.g. C:\Program Files (x86)\WiX Toolset v3.11\bin) or copy the required dll to [SCRIPTDIR]\bin
+    $Global:InnoUnp_exe = "[SCRIPTDIR]\bin\innounp\innounp.exe"                                # Please download "innounp, the Inno Setup Unpacker" from http://innounp.sourceforge.net
+    $Global:WIXToolset_InstallPath = "%ProgramFiles(x86)%\WiX Toolset v3.11"                   # Please download "Wix Toolset" (3.11 or later) from https://wixtoolset.org/releases/ and specify the installation path (e.g. C:\Program Files (x86)\WiX Toolset v3.11)
     $Global:SharedFactoryScript = "[SCRIPTDIR]\WingetBridge-Factory_Shared.psm1"               # WingetBridge Factory - Shared functions
 
     $Global:DownloadTimeout = 900                             # Timout when downloading installers (Some proxy servers need a lot of time to check the content)
@@ -28,6 +37,9 @@
     $Global:InstallerLocale = @("en-US", "de-DE", $null)      # Some installers do not provide a locale (asume it is english or multilange), and some will overwrite already downloaded setups from a different locale (having the same filename)
     $Global:MaxCacheAge = 30                                  # By default wingetbridge caches winget repo for one day, you can specify a custom value in minutes
     $Global:CleanupFiles = $true                              # Remove temporary files from WingetBridgeFactory TempDirectory as soon as we don not need them anymore
+    $Global:UseCachedAppIcons = $true                         # If set to true, a cached *.ico (available in "[ContentSource]\{Publisher}\{WingetPackageId}.ico") will be used. If not available, we try to extract it from an installer
+    $Global:CacheAppIcons = $true                             # If set to true, an extracted icon will be cached as "[ContentSource]\{Publisher}\{WingetPackageId}.ico"
+    $Global:VerboseMessages = $true                           # Use VerboseMessages (for Troubleshooting in WingetBridge Factory)
 
     # Site configuration
     $SiteCode = "LAB"                                         # Site code
@@ -47,7 +59,9 @@ param (
     [Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true,HelpMessage="Use Start-WingetSearch to get the required package",ValueFromPipeline=$true)]
     [endpointmanager.wingetbridge.WingetPackage]$WingetBridgePackage,
     [string]$ContentSourceRootDir,
-    [string]$CMAppFolder
+    [string]$CMAppFolder,
+    [HashTable]$CustomInstallParams,
+    [HashTable]$CustomUninstallParams
 )
     try
     {        
@@ -64,7 +78,7 @@ param (
 
             $AppName = "$($manifest.PackageName) v$($manifest.PackageVersion)"
             $AppVersion = "$($manifest.PackageVersion)"
-            $AdminComment = "AutoGenerated by WingetBridge ($($manifest.PackageIdentifier))"            
+            $AdminComment = "Created with WingetBridge Factory ($($manifest.PackageIdentifier))"
             $FriendlyPublisherName = Get-PathFriendlyName -Name $manifest.Publisher
 
    
@@ -84,7 +98,7 @@ param (
             }
             else
             {
-                Write-Host "$AppName does not exist yet. We create it now..." -ForegroundColor Yellow
+                Write-Host "$AppName does not exist yet. Let's create it ..." -ForegroundColor Yellow
                 $keywords = Get-WingetBridgeKeywordsAsString -Tags $manifest.Tags -maxlength 64
 
                 if ($manifest.Description -eq $null)
@@ -98,21 +112,26 @@ param (
         
                 $PublisherRootDir = "$ContentSourceRootDir\$FriendlyPublisherName"
                 $PackageIdRootDir = "$PublisherRootDir\$($AppName.Trim("."))"
-                $IconResource = "$PublisherRootDir\$($manifest.PackageIdentifier.Trim(".")).ico"
+                $IconResource = "$PublisherRootDir\$($manifest.PackageIdentifier.Trim(".")).ico" #Pre-cached Icon
 
+                $x64InstallerFound = $false
+                $x86InstallerFound = $false
+
+                $IconAttached = $false
+                $ExpectedScope = "machine"
+                                
                 $CreatedDTs = @()
-                foreach ($installer in $manifest.Installers)
-                {
-                    $ExpectedScope = "machine"
-                    $testrun = $true
-
-                    for ($i=1; $i -le 2; $i++) #Loop twice (one for test if supported Installer detected, second for "action"
+                $testrun = $true
+                for ($i=1; $i -le 2; $i++) #Loop twice (one testrun, to detect supported Installers, then for the "magic")
+                {                                                            
+                    foreach ($installer in $manifest.Installers)
                     {
                         if (($testrun -eq $false) -and ($AppCreationIsRequired -eq $true) -and ($SupportedInstallerFound -eq $true)) #Create app if supported installer found ...
                         {
                             Write-Host "Supported installer found, create Application" -ForegroundColor Green
                             $CMAppCreation = New-CMApplication -Name "$AppName" -Keyword $keywords -LocalizedName "$($manifest.PackageName)" -LocalizedDescription "$AppDescription" -Description "$AdminComment" -SoftwareVersion "$AppVersion" -Publisher $FriendlyPublisherName #Always start without icon (*.ico could fail if it contains layers with resolution higher than 512x512)
-                            $CMApp = Get-CMApplication -Name "$AppName" #Verify creation
+                            $CMApp = Get-CMApplication -Name "$AppName" #Verify creation                            
+
                             if ($CMApp -ne $null)
                             {
                                 if (($CMAppFolder -ne $null) -and ($CMAppFolder -ne ""))
@@ -120,6 +139,23 @@ param (
                                     Get-CMApplication -Name "$AppName" | Move-CMObject -FolderPath $CMAppFolder #Move to specified folder
                                 }
                                 $AppCreationIsRequired = $false
+
+                                if (($Global:UseCachedAppIcons) -and (Test-Path -Path "FileSystem::$IconResource")) #Use a pre-cached icon
+                                {                                                                
+                                    $BestIconResolution = Get-BestIconResolution -SourceFile "$IconResource"
+                                    if ($BestIconResolution -ne 0)
+                                    {
+                                        $PNGToImport = "$Global:TempDirectory\$([io.path]::GetFileName($IconResource).Replace(".ico",".png"))"
+                                        Write-Host "Import AppIcon (from PNG): $PNGToImport"
+                                        Save-AsPng -SourceFile $IconResource -TargetFile $PNGToImport -Resolution $BestIconResolution
+                                        if (Test-Path -Path $PNGToImport)
+                                        {
+                                            $CMApp | Set-CMApplication -IconLocationFile $PNGToImport
+                                            Write-Host "`"Pre-cached`" app-icon ($IconResource) was used" -ForegroundColor Gray
+                                            $IconAttached = $true
+                                        }
+                                    }
+                                }
                             }
                         }    
 
@@ -138,9 +174,11 @@ param (
                                 Write-host "Found machine targeted installer ($installerType, $($installer.Architecture)  $($installer.InstallerLocale))" -ForegroundColor Magenta
                             }
 
-                            if (($installerType -eq "nullsoft") -or ($installerType -eq "msi"))
+                            if (($installerType -eq "nullsoft") -or ($installerType -eq "msi") -or ($installerType -eq "inno"))
                             {
-                                $SupportedInstallerFound = $true                        
+                                $SupportedInstallerFound = $true
+                                if ($installer.Architecture -eq "x64") { $x64InstallerFound = $true }
+                                if ($installer.Architecture -eq "x86") { $x86InstallerFound = $true }
                                 if ($testrun -eq $false)
                                 {
                                     $SkipInstaller = $false
@@ -157,6 +195,10 @@ param (
                                     $NewContentFolder = New-Item -ItemType Directory -Path "FileSystem::$ContentSource" -Force
                                     $downloadedInstaller = Start-WingetInstallerDownload -PackageInstaller $installer -TargetDirectory $ContentSource -AcceptAgreements -Timeout $Global:DownloadTimeout                            
 
+                                    if ($installerType -eq "inno")
+                                    {
+                                        $installerdetails = Get-InstallerDetailsForInno -InstallerFile "$ContentSource\$($downloadedInstaller.Filename)" -CustomInnoUnpSource $Global:InnoUnp_exe -ExtractIcon (!$IconAttached) #Extract Inno Compiler Instructions
+                                    }
                                     if ($installerType -eq "nullsoft")
                                     {
                                         $installerdetails = Get-InstallerDetailsForNullsoft -InstallerFile "$ContentSource\$($downloadedInstaller.Filename)" -Custom7zSource $Global:7z15Beta_exe #Extract NullSoft Installer Instructions
@@ -178,29 +220,20 @@ param (
                                         }
                                     }
                             
-                                    if ($installerdetails.FileCount -eq 0)
+                                    if ($installerType -eq "msi")
                                     {
-                                        Write-Host "This is just a MSI-Wrapper including $($installerdetails.BinaryDataCount) binaries. (Please consider using a different InstallerType)" -ForegroundColor Red
-                                        if (!($Global:AllowMSIWrappers)) { $SkipInstaller = $true }
+                                        if ($installerdetails.FileCount -eq 0)
+                                        {
+                                            Write-Host "This is just a MSI-Wrapper including $($installerdetails.BinaryDataCount) binaries. (Please consider using a different InstallerType)" -ForegroundColor Red
+                                            if (!($Global:AllowMSIWrappers)) { $SkipInstaller = $true }
+                                        }
                                     }
 
-                                    $SupportedPlatform = @()                   
-                                    if ($installer.Architecture -eq "x64")
-                                    {
-                                        $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(64-bit)*" | Where-Object PlatformType -eq 1
-                                        $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(64-bit)*" | Where-Object PlatformType -eq 1
-                                    }
-                                    if ($installer.Architecture -eq "x86")
-                                    {
-                                        $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(32-bit)*" | Where-Object PlatformType -eq 1
-                                        $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(32-bit)*" | Where-Object PlatformType -eq 1
-                                    }
-                                    if ($SupportedPlatform -eq $null)
+                                    if (($installer.Architecture -ne "x64") -and ($installer.Architecture -ne "x86"))
                                     {
                                         Write-Host "Skip installer, with unexpected architecture" -ForegroundColor Red
                                         $SkipInstaller = $true
-                                    }
-                                    $OSRequirements = $OperatingSystemCondition | New-CMRequirementRuleOperatingSystemValue -RuleOperator OneOf -Platform $SupportedPlatform
+                                    }                                    
 
                                     #Check if we already created an equivalent DT
                                     if ($CreatedDTs -contains "$Scope_$($installer.Architecture)_$installerLocale")
@@ -211,11 +244,35 @@ param (
 
                                     if (!($SkipInstaller))
                                     {
-                                        if ($installerdetails.TemporaryIconFile -ne "") #Set the AppIcon
+                                        if (($x86InstallerFound -eq $true) -and ($x64InstallerFound -eq $true))
                                         {
-                                            if ((Test-Path -Path "FileSystem::$($installerdetails.TemporaryIconFile)") -and (!(Test-Path -Path "FileSystem::$IconResource"))) #Save the Icon we extracted
+                                            $SupportedPlatform = @()                   
+                                            if ($installer.Architecture -eq "x64")
                                             {
-                                                Copy-Item "FileSystem::$($installerdetails.TemporaryIconFile)" -Destination "FileSystem::$IconResource"
+                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(64-bit)*" | Where-Object PlatformType -eq 1
+                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(64-bit)*" | Where-Object PlatformType -eq 1
+                                            }
+                                            if ($installer.Architecture -eq "x86")
+                                            {
+                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(32-bit)*" | Where-Object PlatformType -eq 1
+                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(32-bit)*" | Where-Object PlatformType -eq 1
+                                            }
+                                            $OSRequirements = $OperatingSystemCondition | New-CMRequirementRuleOperatingSystemValue -RuleOperator OneOf -Platform $SupportedPlatform
+                                            Write-Host "Created OperatingSystem-RequirementRule (for $($installer.Architecture))"
+                                        }
+                                        else
+                                        {
+                                            $OSRequirements = @()
+                                        }
+                                                                            
+                                        if (($IconAttached -eq $false) -and ($installerdetails.TemporaryIconFile -ne "")) #Set the AppIcon
+                                        {
+                                            if ($Global:CacheAppIcons)
+                                            {
+                                                if ((Test-Path -Path "FileSystem::$($installerdetails.TemporaryIconFile)") -and (!(Test-Path -Path "FileSystem::$IconResource"))) #Save the Icon we extracted
+                                                {                                                
+                                                    Copy-Item "FileSystem::$($installerdetails.TemporaryIconFile)" -Destination "FileSystem::$IconResource"
+                                                }
                                             }
                                             if ($installerdetails.BestIconResolution -gt 0)
                                             {
@@ -223,12 +280,13 @@ param (
                                                 Write-Host "Import AppIcon (from PNG): $PNGToImport"
                                                 Save-AsPng -SourceFile $IconResource -TargetFile $PNGToImport -Resolution $installerdetails.BestIconResolution
                                                 Get-CMApplication -Name $AppName | Set-CMApplication -IconLocationFile $PNGToImport
+                                                $IconAttached = $true
                                             }
                                         }                            
 
                                         if ($Global:CleanupFiles)
                                         {
-                                            Remove-WingetBridgeFactoryTempFiles -TempDirectory $Global:TempDirectory #Now that we have the icon, we can delete the temporary files                                        
+                                            Remove-WingetBridgeFactoryTempFiles -TempDirectory $Global:TempDirectory -FullCleanup $false #Now that we have the icon, we can delete the temporary files                                        
                                         }
 
                                         ###
@@ -236,57 +294,104 @@ param (
                                         ##
                                         if ($installerType -eq "msi")
                                         {
-                                            $InstallProgram = "msiexec /I `"$($downloadedInstaller.Filename)`" /Q"
-                                            $UninstallProgram = "msiexec /X $($installerdetails.ProductCode) /Q"
+                                            if ($CustomInstallParams[$WingetBridgePackage.PackageId] -eq $null)
+                                            {
+                                                $InstallProgram = "msiexec /I `"$($downloadedInstaller.Filename)`" /Q"
+                                            }
+                                            else
+                                            {
+                                                $InstallProgram = "msiexec /I `"$($downloadedInstaller.Filename)`" $($CustomInstallParams[$WingetBridgePackage.PackageId])" #use custom install parameters
+                                            }
+                                            if ($CustomUninstallParams[$WingetBridgePackage.PackageId] -eq $null)
+                                            {
+                                                $UninstallProgram = "msiexec /X $($installerdetails.ProductCode) /Q"
+                                            }
+                                            else
+                                            {
+                                                $UninstallProgram = "msiexec /X $($installerdetails.ProductCode) $($CustomUninstallParams[$WingetBridgePackage.PackageId])" #use custom uninstall parameters
+                                            }
                                             $CMDeploymentType = Add-CMMsiDeploymentType -ApplicationName "$AppName" -DeploymentTypeName $DeploymentTypeName -ContentLocation "$ContentSource\$($downloadedInstaller.Filename)" -LogonRequirementType WhereOrNotUserLoggedOn -UninstallOption "NoneRequired" -InstallationBehaviorType InstallForSystem -UninstallCommand $UninstallProgram -AddRequirement $OSRequirements -UserInteractionMode Hidden
                                         }
 
                                         ###
-                                        # Create Script-DeploymentType with Registry-Detection (for NULLSOFT)
+                                        # Create Script-DeploymentType with Registry-or File-Detection (for NULLSOFT and INNO)
                                         ##
-                                        if ($installerType -eq "nullsoft")
+                                        if (($installerType -eq "nullsoft") -or ($installerType -eq "inno"))
                                         {
-                                            $InstallProgram = "`"$($downloadedInstaller.Filename)`" /S /allusers" #nullsoft installer (machine)
-                                            $RequiresWow6432 = $false
+                                            if ($CustomInstallParams[$WingetBridgePackage.PackageId] -eq $null)
+                                            {
+                                                if ($installerType -eq "nullsoft") {
+                                                    $InstallProgram = "`"$($downloadedInstaller.Filename)`" /S /allusers" #nullsoft installer (machine)
+                                                }
+                                                if ($installerType -eq "inno") {
+                                                    $InstallProgram = "`"$($downloadedInstaller.Filename)`" /VERYSILENT /ALLUSERS /NORESTART" #inno installer (machine)
+                                                }
+                                            }
+                                            else
+                                            {
+                                                $InstallProgram = "`"$($downloadedInstaller.Filename)`" $($CustomInstallParams[$WingetBridgePackage.PackageId])" #use custom install parameters
+                                            }
+                                            $RequiresWow6432 = $false                                            
                                             if ($($installerdetails.UninstallString) -ne "")
                                             {
-                                                $UninstallProgram = "`"$($installerdetails.UninstallString)`" /S /allusers _?=$($installerdetails.InstallDir)" #do not use quotes after _? (even if path contains spaces)
-                                                $UninstallProgram = $UninstallProgram.Replace("`$INSTDIR", $($installerdetails.InstallDir))
-
-                                                $UninstallProgram = $UninstallProgram.Replace("`$PROGRAMFILES64", "%ProgramFiles%")
-                                                $UninstallProgram = $UninstallProgram.Replace("`$PROGRAMFILES32", "%ProgramFiles(x86)%")
-                                                if ($UninstallProgram.Contains("`$PROGRAMFILES"))
+                                                if ($CustomUninstallParams[$WingetBridgePackage.PackageId] -eq $null)
                                                 {
-                                                    if ($installer.Architecture -eq "x64") #Targeted for x64, but contains 32bit App-Directory
-                                                    {
-                                                        $RequiresWow6432 = $true #Used later for Registry-Entries (Uninstaller, which might be in Wow6432Node)
-                                                        $UninstallProgram = $UninstallProgram.Replace("`$PROGRAMFILES", "%ProgramFiles(x86)%")
+                                                    if ($installerType -eq "nullsoft") {
+                                                        $UninstallProgram = "`"$($installerdetails.UninstallString)`" /S /allusers _?=$($installerdetails.InstallDir)" #do not use quotes after _? (even if path contains spaces)
+                                                        $UninstallProgram = $UninstallProgram.Replace("`$INSTDIR", $($installerdetails.InstallDir))
+
+                                                        $UninstallProgram = $UninstallProgram.Replace("`$PROGRAMFILES64", "%ProgramFiles%")
+                                                        $UninstallProgram = $UninstallProgram.Replace("`$PROGRAMFILES32", "%ProgramFiles(x86)%")
+                                                        if ($UninstallProgram.Contains("`$PROGRAMFILES"))
+                                                        {
+                                                            if ($installer.Architecture -eq "x64") #Targeted for x64, but contains 32bit App-Directory
+                                                            {
+                                                                $RequiresWow6432 = $true #Used later for Registry-Entries (Uninstaller, which might be in Wow6432Node)
+                                                                $UninstallProgram = $UninstallProgram.Replace("`$PROGRAMFILES", "%ProgramFiles(x86)%")
+                                                            }
+                                                            else #Targeted for x86
+                                                            {                                
+                                                                $UninstallProgram = $UninstallProgram.Replace("`$PROGRAMFILES", "%ProgramFiles(x86)%") #Does that work on a x86(??)
+                                                            }
+                                                        }
                                                     }
-                                                    else #Targeted for x86
-                                                    {                                
-                                                        $UninstallProgram = $UninstallProgram.Replace("`$PROGRAMFILES", "%ProgramFiles(x86)%") #Does that work on a x86(??)
+                                                    if ($installerType -eq "inno") {
+                                                        $UninstallProgram = "`"$($installerdetails.UninstallString)`" /VERYSILENT /NORESTART"
                                                     }
+                                                }
+                                                else
+                                                {
+                                                    $UninstallProgram = "`"$($installerdetails.UninstallString)`" $($CustomUninstallParams[$WingetBridgePackage.PackageId])" #use custom uninstall parameters
                                                 }
                                             }
                                             else #Could not detect a usefull uninstaller (needs to be specified manually)
                                             {
-                                                $UninstallProgram = ""
+                                                $UninstallProgram = "`"$($installerdetails.UninstallString)`" $($CustomUninstallParams[$WingetBridgePackage.PackageId])" #use custom uninstall parameters
                                             }
+
+                                            if (($installerType -eq "inno") -and ($($installerdetails.Is64bit) -eq $false)) { $RequiresWow6432 = $true }
 
                                             $CMDeploymentType = Add-CMScriptDeploymentType -ScriptLanguage VBScript -LogonRequirementType WhetherOrNotUserLoggedOn -ScriptText "option explicit" -ApplicationName "$AppName" -DeploymentTypeName $DeploymentTypeName -ContentLocation "$ContentSource" -UninstallOption "NoneRequired" -InstallationBehaviorType InstallForSystem -InstallCommand "$InstallProgram" -UninstallCommand $UninstallProgram                                           
 
-                                            #Get Detection Information from current Installer
+                                            #Get Detection-Method from current Installer
                                             $DetectionClauses = @()
-
                                             $DetectionRegKey = $installerdetails.UninstallRegKey                            
                                             if (($DetectionRegKey -eq "") -or ($DetectionRegKey -eq $null))
                                             {
                                                 Write-Host "Installer seems to be `"Registry-Free`", try to use file-detection..."
-                                                $FileToDetect = [io.path]::GetFileName($installerdetails.FileDetection)
-                                                $FilePathToDetect = [io.path]::GetDirectoryName($installerdetails.FileDetection)                                
-                                                $FileDetection = New-CMDetectionClauseFile -FileName $FileToDetect -Is64Bit:$true -Path $FilePathToDetect -ExpressionOperator IsEquals -PropertyType Version -ExpectedValue $installerdetails.FileDetectionVersion.Replace(",",".") -Value
-                                                #$FileDetection = New-CMDetectionClauseFile -FileName $FileToDetect -Is64Bit:$true -Path "C:\somewhere" -ExpressionOperator IsEquals -PropertyType Version -ExpectedValue $installerdetails.FileDetectionVersion.Replace(",",".") -Value
-                                                $DetectionClauses += $FileDetection
+                                                if (($installerdetails.FileDetection -ne "") -and ($installerdetails.FileDetection -ne $null))
+                                                {
+                                                    $FileToDetect = [io.path]::GetFileName($installerdetails.FileDetection)
+                                                    $FilePathToDetect = [io.path]::GetDirectoryName($installerdetails.FileDetection)                                
+                                                    $ExpectedFileVersion = $($installerdetails.FileDetectionVersion).Replace(",","")
+                                                    Write-Host "Expected FileVersion is $ExpectedFileVersion"
+                                                    $FileDetection = New-CMDetectionClauseFile -FileName $FileToDetect -Is64Bit:$true -Path $FilePathToDetect -ExpressionOperator IsEquals -PropertyType Version -ExpectedValue $ExpectedFileVersion -Value
+                                                    $DetectionClauses += $FileDetection
+                                                }
+                                                else
+                                                {
+                                                    Write-Host "We did not found a useable file- oder registry-detection in this installer. Requires manual configuration!" -ForegroundColor Yellow
+                                                }
                                             }
                                             else
                                             {
@@ -331,13 +436,13 @@ param (
                                     } #SkipInstaller
                                 }
                             }
-                        }
-                        $testrun = $false #next loop wont be a testrun
-                    } ## Loop twice (inside the same installer)
-                }
+                        }                        
+                    } ## foreach installer
+                    $testrun = $false #next loop wont be a testrun
+                } ## Loop twice (inside the same installer)
                 if ($SupportedInstallerFound -ne $true)
                 {
-                    Write-Host "Package found, but no supported installer found" -ForegroundColor Yellow
+                    Write-Host "Package found, but no supported installer" -ForegroundColor Yellow
                 }
             }
         }
@@ -394,8 +499,33 @@ param (
     $Global:TempDirectory = $Global:TempDirectory.Replace("[SCRIPTDIR]", "$ScriptDir")
     $Global:7z15Beta_exe = $Global:7z15Beta_exe.Replace("[SCRIPTDIR]", "$ScriptDir")
     $Global:LessMSI_exe = $Global:LessMSI_exe.Replace("[SCRIPTDIR]", "$ScriptDir")
-    $Global:WindowsInstaller_dll = $Global:WindowsInstaller_dll.Replace("[SCRIPTDIR]", "$ScriptDir")
+    $Global:InnoUnp_exe = $Global:InnoUnp_exe.Replace("[SCRIPTDIR]", "$ScriptDir")    
     $Global:SharedFactoryScript = $Global:SharedFactoryScript.Replace("[SCRIPTDIR]", "$ScriptDir")
+
+    $Global:WIXToolset_InstallPath = $Global:WIXToolset_InstallPath.Replace("[SCRIPTDIR]", "$ScriptDir")
+    $Global:WIXToolset_InstallPath = $Global:WIXToolset_InstallPath.Replace("%ProgramFiles(x86)%", [Environment]::GetEnvironmentVariable("ProgramFiles(x86)"))
+    $Global:WIXToolset_InstallPath = $Global:WIXToolset_InstallPath.Replace("%ProgramFiles%", [Environment]::GetEnvironmentVariable("ProgramFiles"))
+    $Global:WIXToolset_InstallPath = $Global:WIXToolset_InstallPath.TrimEnd("\")
+    $Global:WindowsInstaller_dll = "$($Global:WIXToolset_InstallPath)\bin\Microsoft.Deployment.WindowsInstaller.dll"
+    $Global:WIX_Dark_exe = "$($Global:WIXToolset_InstallPath)\bin\dark.exe"
+
+    #Verify dependencies of WingetBridge Factory ...
+    if ((!(Test-Path -Path "FileSystem::$Global:WindowsInstaller_dll")) -or (!(Test-Path -Path "FileSystem::$Global:WIX_Dark_exe"))) { Write-Host "ERROR: Please install WIX Toolset before using WingetBridge Factory!" -ForegroundColor Red
+        break
+    }
+    if (!(Test-Path -Path "FileSystem::$Global:InnoUnp_exe")) { Write-Host "ERROR: Please install Inno Setup Unpacker (innounp, from {http://innounp.sourceforge.net/}) before using WingetBridge Factory!" -ForegroundColor Red
+        break
+    }
+    if (!(Test-Path -Path "FileSystem::$Global:LessMSI_exe")) { Write-Host "ERROR: Please install MSI Unpacker (lessmsi, {from https://github.com/activescott/lessmsi/releases}) before using WingetBridge Factory!" -ForegroundColor Red
+        break
+    }
+    if (!(Test-Path -Path "FileSystem::$Global:7z15Beta_exe")) { Write-Host "ERROR: Please install the correct version of 7-Zip (15.05 beta, {from https://sourceforge.net/projects/sevenzip/files/7-Zip/15.05/}) before using WingetBridge Factory!" -ForegroundColor Red
+        break
+    }
+	$getwgm = Get-Command Get-WingetManifest -ErrorAction Ignore
+	if (!(($getwgm -ne $null) -and (($getwgm).Version -ige "1.2.0.0"))) { Write-Host "ERROR: Please install the latest version of WingetBridge (1.2.0.0 or later {from https://github.com/endpointmanager/wingetbridge-powershell}) before using WingetBridge Factory!" -ForegroundColor Red
+		break
+	}
 
     #Create the required subdirectories
     $nf = New-Item -ItemType Directory -Path "FileSystem::$ScriptDir\bin" -Force
@@ -408,9 +538,13 @@ param (
     foreach ($IdToSync in $WingetPackageIdsToSync)
     {
         Write-Host "Search for `"$IdToSync`" in winget repository ..."
-        $CreatedPackage = Start-WingetSearch -SearchById $IdToSync -MaxCacheAge $Global:MaxCacheAge | New-CMWingetBridgePackage -ContentSourceRootDir $ContentSource -CMAppFolder $CMApplicationFolder
+        $CreatedPackage = Start-WingetSearch -SearchById $IdToSync -MaxCacheAge $Global:MaxCacheAge | New-CMWingetBridgePackage -ContentSourceRootDir $ContentSource -CMAppFolder $CMApplicationFolder -CustomInstallParams $InstallParams -CustomUninstallParams $UninstallParams
         Write-Host ""
-    }    
+    }
+    if ($Global:CleanupFiles)
+    {
+        Remove-WingetBridgeFactoryTempFiles -TempDirectory $Global:TempDirectory -FullCleanup $true
+    }  
     Write-Host "We are done! Thank you for using WingetBridge Factory!" -ForegroundColor Green
 
 #
