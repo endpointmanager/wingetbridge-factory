@@ -18,7 +18,7 @@ The windows package manager repository contains 2900+ software packages, but in 
 
 Each available package contains one or more installers (for various architectures, operating systems or languages) by using different installer technologies like MSI, NULLSOFT, INNO, Legacy-Setups (EXE), MSIX, APPX and APPXBUNDLE.  
 
-Unfortunately, the winget repository does not provide a reliable detection-method before installing a package on a system. It also does not provide any app-icons (e.g. to be used in a self-service-portal like Softwarecenter).
+Unfortunately, the winget repository does not provide a reliable detection-method before installing a package on a system. It also does not provide any app-icons (to be used in a self-service-portal like Softwarecenter).
 
 WingetBridge Factory analyze installers **on the fly** and tries to detect a reliable detection-method and extracts an icon for some installer types.
 This method will not deliver always a 100% reliable detection-method and there is room for a lot of improvements. Therefore, I recommend to verify package-creation manually (at least once per new PackageIDs added into the configuration).  
