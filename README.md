@@ -8,20 +8,22 @@ WingetBridge Factory creates new software packages in your deployment tool, base
 
 ## Community-driven Project
 
-While there is only one example (for MEMCM, formerly ConfigMgr) in this repository, I'm very mind-opened in supporting a community-driven collaboration to provide more examples on how to use WingetBridge for various deployment tools like Microsoft Intune, MDT, DCM or VMWare Airwatch.  
+While there is only one example (for MEMCM, formerly ConfigMgr) in this repository, I'm very mind-opened in supporting a community-driven collaboration to provide more examples on how to use WingetBridge for various deployment tools like Microsoft Intune or MDT.  
 
 If you are interested in contributing, please submit a pull request (PR) or contact me on [twitter](https://twitter.com/PaulJezek).
 
 ## Compatibility
 
-At the moment the windows package manager repository contains 2900+ software packages.  
+The windows package manager repository contains 2900+ software packages, but in theory only **2300+ packages can be synchronized** by using WingetBridge Factory at the moment.
 
-Each of them contains one or more installers (for various architectures, operating systems or languages) by using different installer technologies like MSI, NULLSOFT, INNO, Legacy-Setups (EXE), MSIX, APPX and APPXBUNDLE.  
+Each available package contains one or more installers (for various architectures, operating systems or languages) by using different installer technologies like MSI, NULLSOFT, INNO, Legacy-Setups (EXE), MSIX, APPX and APPXBUNDLE.  
 
-Unfortunately, the winget repository does not provide a reliable detection-method (which is required for most software deployment tools on the market) for all installer types. It also does not provide any app-icons (e.g. to be used in a self-service-portal like Softwarecenter). WingetBridge Factory tries to extracts that information from the downloaded setup itself.
-This method will not always deliver a 100% reliable detection-method and needs to get verified manually after the package was created.  
+Unfortunately, the winget repository does not provide a reliable detection-method before installing a package on a system. It also does not provide any app-icons (e.g. to be used in a self-service-portal like Softwarecenter).
 
-At the moment, the available scripts are intended to be used with MEMCM (formerly ConfigMgr) and only supports MSI and NULLSOFT installers. However, the MEMCM-script can be extended or even adopted for a different software deployment tool, depending on your own scripting-skills.
+WingetBridge Factory analyze installers **on the fly** and tries to detect a reliable detection-method and extracts an icon for some installer types.
+This method will not deliver always a 100% reliable detection-method and there is room for a lot of improvements. Therefore, I recommend to verify package-creation manually (at least once per new PackageIDs added into the configuration).  
+
+The available script is intended to be used with MEMCM (formerly ConfigMgr) and only supports MSI, NULLSOFT and INNO installers at the moment. However, the MEMCM-script could be extended or even modified for different software deployment tools, depending on your own scripting-skills.
 
 ## Risk of damage :warning:
 
@@ -34,7 +36,7 @@ The function "New-CMWingetBridgePackage" is the main-function of the MEMCM asume
 
 ## Planned features
 
-* Support for INNO Setups will be available within the next few weeks.
+* <del>Support for INNO Setups will be available within the next few weeks<del> (added in v1.06)
 * (Optional) E-Mail notification when a new software package was created
 * Automatically create supersedence (MEMCM)
 
@@ -56,14 +58,14 @@ Follow me on twitter and github to get notified about updates.
 In the initial setup, you specify a list of package-IDs you want to "synchronize" the latest available version into your software deployment tool.
 
 There are multiple ways to find PackageIDs within the winget repository:
-* By using the WingetBridge-PSModule(https://github.com/endpointmanager/wingetbridge-powershell)
-* By using the winget-cli(https://github.com/microsoft/winget-cli)
-* winstall.app, Online-WebUI(https://winstall.app/)
+* By using the [WingetBridge-cmdlets](https://github.com/endpointmanager/wingetbridge-powershell)
+* By using the [winget-cli](https://github.com/microsoft/winget-cli)
+* By using your Browser [Winstall.app](https://winstall.app/)
 
 ### # CONFIGURATION STARTS HERE
 This is where the configuration starts.
 
-* $WingetPackageIdsToSync -> Here you specify the list of PackageIDs that you want to get automatically maintained by Wingetbridge Factory
+* $WingetPackageIdsToSync -> Specify the list of PackageIDs you want to get maintained by WingetBridge Factory
 * Other variables are described inside the script.
 
 ### # CONFIGURATION ENDS HERE
@@ -75,10 +77,11 @@ If you want to modify or extend the functionality of the script, I highly recomm
 
 The scripts in this repository, depends on several open source projects:
 
-* [WingetBridge-Powershell-Module](https://github.com/endpointmanager/wingetbridge-powershell)
-* [7-Zip v15.05 beta**](https://sourceforge.net/projects/sevenzip/files/7-Zip/15.05/) (Required to extract and analyze NULLSOFT-Scripts, and to extract Icons)
+* [WingetBridge-Powershell-Module](https://github.com/endpointmanager/wingetbridge-powershell) (Please use the latest version)
+* [7-Zip v15.05 beta**](https://sourceforge.net/projects/sevenzip/files/7-Zip/15.05/) (Required analyze NULLSOFT-Scripts, and to extract icons)
 * [WIX Toolset](https://wixtoolset.org/) (Required to analyze MSI Setups)
-* [lessMSI](https://lessmsi.activescott.com/) (Required to extract Icons from big MSI-files)
+* [lessMSI](https://lessmsi.activescott.com/) (Required to extract icons from big MSI-installers)
+* [innounp](http://innounp.sourceforge.net/) (Required analyze INNO-Scripts, and to extract Icons)
 
 > **newer versions of 7-Zip do not extract and decode the required NSIS (nullsoft installer script). Please use v15.05!
 
