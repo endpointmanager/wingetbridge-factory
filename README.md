@@ -79,9 +79,9 @@ If you want to modify or extend the functionality of the script, I highly recomm
 The scripts in this repository, depends on several open source projects:
 
 * [WingetBridge-Powershell-Module](https://github.com/endpointmanager/wingetbridge-powershell) (Please use the latest version)
-* [7-Zip v15.05 beta**](https://sourceforge.net/projects/sevenzip/files/7-Zip/15.05/) (Required analyze NULLSOFT installers, and to extract icons)
+* [7-Zip v15.05 beta**](https://sourceforge.net/projects/sevenzip/files/7-Zip/15.05/) (Required to analyze NULLSOFT installers, and to extract icons)
 * [WIX Toolset](https://wixtoolset.org/) (Required to analyze MSI installers)
-* [lessMSI](https://lessmsi.activescott.com/) (Required to extract icons from big MSI-installers)
+* [lessMSI](https://lessmsi.activescott.com/) (Required to extract icons from big MSI installers)
 * [innounp](http://innounp.sourceforge.net/) (Required to analyze INNO installers, and to extract Icons)
 
 > **newer versions of 7-Zip do not extract and decode the required NSIS (nullsoft installer script). Please use v15.05!
