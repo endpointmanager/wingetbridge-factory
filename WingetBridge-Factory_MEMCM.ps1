@@ -39,7 +39,7 @@
     $Global:CleanupFiles = $true                              # Remove temporary files from WingetBridgeFactory TempDirectory as soon as we don not need them anymore
     $Global:UseCachedAppIcons = $true                         # If set to true, a cached *.ico (available in "[ContentSource]\{Publisher}\{WingetPackageId}.ico") will be used. If not available, we try to extract it from an installer
     $Global:CacheAppIcons = $true                             # If set to true, an extracted icon will be cached as "[ContentSource]\{Publisher}\{WingetPackageId}.ico"
-    $Global:VerboseMessages = $true                           # Use VerboseMessages (for Troubleshooting in WingetBridge Factory)
+    $Global:VerboseMessages = $false                          # Use VerboseMessages (for troubleshooting WingetBridge Factory)
 
     # Site configuration
     $SiteCode = "LAB"                                         # Site code
