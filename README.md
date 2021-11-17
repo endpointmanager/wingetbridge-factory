@@ -103,7 +103,7 @@ WingetBridge-Factory_Shared.psm1 - Module required by all other scripts (contain
 * Scott Willeke and the contributors of [lessmsi](https://lessmsi.activescott.com/)
 * Everyone who is willing to use WingetBridge Factory, so software developers realize how important it is to maintain their packages through the winget-repository.
 
-## License (does not include 3rd party software, which can be downloaded using this script)
+## License (applies to WingetBridge Factory only, and not it's dependencies)
 
 See [LICENSE](LICENSE) file for licence rights and limitations (MIT)
 
