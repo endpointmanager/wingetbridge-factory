@@ -36,7 +36,8 @@ The function "New-CMWingetBridgePackage" is the main-function of the MEMCM asume
 
 ## Planned features
 
-* <del>Support for INNO Setups will be available within the next few weeks<del> (added in v1.06)
+* <del>Support for INNO installers will be available within the next few weeks<del> (added in v1.06)
+* Support for BURN (WIX Bootstrapper) installers should be available within the next few weeks
 * (Optional) E-Mail notification when a new software package was created
 * Automatically create supersedence (MEMCM)
 
