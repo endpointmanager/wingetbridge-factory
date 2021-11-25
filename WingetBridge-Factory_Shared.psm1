@@ -1,8 +1,8 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.6, Nov 17, 2021
+# ScriptVersion:   v1.0.7, Nov 25, 2021
 # Description:     WingetBridge Factory - Shared functions
-# Compatibility:   MSI, NULLSOFT, INNO
+# Compatibility:   MSI, NULLSOFT, INNO, BURN
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory
 #######
 
@@ -111,8 +111,7 @@ param (
     $newbmp.Dispose()
     try
     {
-        Test-Path $TargetFile
-        Write-Host "$TargetFile saved" -ForegroundColor Green
+        Test-Path $TargetFile | Out-Null        
     }
     catch
     {
@@ -297,7 +296,7 @@ param (
                 $CurrentIcon = ("$($Global:TempDirectory)\$ExeWithIcon").Replace(".exe",".ico")                
                 if (Test-Path -Path "FileSystem::$($Global:TempDirectory)\$ExeWithIcon")
                 {
-                    $InstallerDetails.FileDetectionVersion = ((Get-Item "$($Global:TempDirectory)\$ExeWithIcon").VersionInfo.FileVersion).Replace(", ", ".")
+                    $InstallerDetails.FileDetectionVersion = (Get-Item "$($Global:TempDirectory)\$ExeWithIcon").VersionInfo.FileVersionRaw
                 
                     if (!(Test-Path -Path "FileSystem::$CurrentIcon"))
                     {
@@ -448,6 +447,105 @@ param (
         {
             Write-Host "Setup does not look like an msi-installer!" -ForegroundColor Red
         }
+    }
+}
+
+function Get-InstallerDetailsForBURN
+{
+param (
+    [string]$InstallerFile,
+    [string]$Custom7zSource,    
+    [bool]$ExtractIcon    
+)
+
+    $installerDetails = @{
+        Name = ""
+        Publisher = ""
+        InstallDir = ""
+        UninstallRegKey = ""
+        DisplayIcon = ""
+        DisplayName = ""
+        DisplayVersion = ""        
+        UninstallString = ""        
+        TemporaryIconFile = "" #extracted in temp-directory
+        FileDetection = ""
+        FileDetectionVersion = ""
+        BestIconResolution = 0
+        RegistrationId  = "" #BURN-specific
+    }
+
+    if (!(Test-Path -Path "FileSystem::$InstallerFile")) { Write-Host "Installer not found ($InstallerFile)" -ForegroundColor Red } else {
+        $IsSigned = Test-InstallerAuthenticodeSignature -InstallerFile "$InstallerFile"
+
+        #Verify if 7-Zip exists, to extract manifest from BURN/Wix-Bootstrapper
+        if (($Custom7zSource -eq $null) -or ($Custom7zSource -eq "")) { $Custom7zSource = "C:\Program Files\7-Zip\7z.exe" }
+        Write-Host "Verify existence of 7-Zip [$Custom7zSource]" -ForegroundColor Magenta #for BURN, no specific version of 7-zip is required (tested with 15.05 beta)
+        if (!(Test-Path -Path "FileSystem::$Custom7zSource"))
+        {        
+            Write-Host "Please install 7-Zip (Version 15.05, 64bit is recommended). It is required to extract BURN manifest" -ForegroundColor Red
+            break
+        }
+
+        #Create subdirectory inside the temp folder        
+        $Foldername = [io.path]::GetFileName($InstallerFile).TrimEnd(".exe")
+        $nf = New-Item -ItemType Directory -Path "FileSystem::$Global:TempDirectory\$Foldername" -Force                        
+        Start-Process -FilePath "$Custom7zSource" -ArgumentList @("x", "`"$InstallerFile`"", "-i!`"0`"", "-o`"$($Global:TempDirectory)\$Foldername\`"", "-y") -WindowStyle Hidden -Wait
+        
+        if (Test-Path -Path "FileSystem::$($Global:TempDirectory)\$Foldername\0")
+        {
+            $BURN_manifest = New-Object xml            
+            $BURN_manifest.Load( (Convert-Path "FileSystem::$($Global:TempDirectory)\$Foldername\0"))
+            if ($BURN_manifest.BurnManifest -ne $null)
+            {
+                $installerDetails['RegistrationId']  = $BURN_manifest.BurnManifest.Registration.Id
+                $installerDetails['UninstallString']  = "C:\ProgramData\Package Cache\$($BURN_manifest.BurnManifest.Registration.Id)\$($BURN_manifest.BurnManifest.Registration.ExecutableName)"
+                if ($BURN_manifest.BurnManifest.Registration.Arp -ne $null)
+                {
+                    $installerDetails['Name']  = $BURN_manifest.BurnManifest.Registration.Arp.DisplayName
+                    $installerDetails['DisplayName']  = $BURN_manifest.BurnManifest.Registration.Arp.DisplayName
+                    $installerDetails['DisplayVersion']  = $BURN_manifest.BurnManifest.Registration.Arp.DisplayVersion
+                    $installerDetails['Publisher']  = $BURN_manifest.BurnManifest.Registration.Arp.Publisher
+                }
+                $installerDetails['UninstallRegKey']  = "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($BURN_manifest.BurnManifest.Registration.Id)" #seems to be always registered in Wow6432Node?!
+            }
+            else
+            {
+                Write-Host "Setup does not look like a BURN-installer!" -ForegroundColor Red
+            }
+        }
+        else
+        {
+            Write-Host "Setup does not look like a BURN-installer!" -ForegroundColor Red
+        }
+
+        #At the moment we extract the icon from the installer.exe
+        if ($ExtractIcon)
+        {
+            #$installerDetails = Get-WingetBridgeIcon -InstallerDetails $InstallerDetails -InstallerType "nullsoft" -CustomExtractor $Custom7zSource -ExeShortCuts @( "$InstallerFile" )
+            $CurrentIcon = "$($Global:TempDirectory)\$Foldername\$([io.path]::GetFileName($InstallerFile).Replace(".exe",".ico"))"
+            if (!(Test-Path -Path "FileSystem::$CurrentIcon"))
+            {
+                try
+                {
+                    $nouptput = Save-WingetBridgeAppIcon -SourceFile $InstallerFile -TargetIconFile $CurrentIcon
+                }
+                catch
+                {
+                    Write-Host "We were not able to extract an icon from `"$InstallerFile`"" -ForegroundColor Yellow
+                } #could be an executable that does not contain an icon
+            }
+            if (Test-Path -Path "FileSystem::$CurrentIcon")
+            {
+                $InstallerDetails.TemporaryIconFile = $CurrentIcon
+                $InstallerDetails.BestIconResolution = Get-BestIconResolution -SourceFile "$InstallerFile"
+            }
+        }
+        
+
+        #Cleanup temp directory
+        Write-Host "cleanup tempfolder" -ForegroundColor Magenta
+        if (!(Test-Path -Path "FileSystem::$($nf.FullName)")) { Remove-Item -Recurse "FileSystem::$($nf.FullName)" }
+        return $installerdetails
     }
 }
 
