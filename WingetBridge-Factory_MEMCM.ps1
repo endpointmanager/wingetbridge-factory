@@ -11,7 +11,7 @@
 ###
 
     # Specify whatever winget-IDs you want to "synchronize" with MEMCM (2900+ packages are available) - You can search for winget-IDs by using the [Start-WingetSearch]-cmdlet, or visit https://winstall.app
-	$WingetPackageIdsToSync = @( "Microsoft.VisualStudioCode", "Microsoft.PowerBI", "VideoLAN.VLC")
+    $WingetPackageIdsToSync = @( "Microsoft.VisualStudioCode", "Microsoft.PowerBI", "VideoLAN.VLC")
     $ContentSource = "\\MEMCM01\Setups"                                                        # Content will be automatically downloaded to a new subdirectory like [ContentSource]\Publisher\Appname\Architecture\SomeInstaller.msi
     $CMApplicationFolder = ""                                                                  # Specify a folder in MEMCM where to move created applications by WingetBridge Factory (e.g. LAB:\WingetBridgeFactory") If you leave this empty, it will be stored in the root-folder
 
@@ -19,7 +19,7 @@
     $InstallParams = @{}
     $InstallParams['Microsoft.VisualStudioCode'] = "/VERYSILENT /NORESTART /MERGETASKS=!runcode"           # This is just an example (for Microsoft.VisualStudioCode)
     $InstallParams['Microsoft.VisualStudioCode.Insiders'] = "/VERYSILENT /NORESTART /MERGETASKS=!runcode"  # This is just an example (for Microsoft.VisualStudioCode.Insiders)
-	$InstallParams['Microsoft.PowerBI'] = "-q -norestart ACCEPT_EULA=1"                                    # This is just an example (for Microsoft.PowerBI)
+    $InstallParams['Microsoft.PowerBI'] = "-q -norestart ACCEPT_EULA=1"                                    # This is just an example (for Microsoft.PowerBI)
 
     # Custom uninstall-parameters (optional)
     $UninstallParams = @{}
@@ -342,7 +342,7 @@ param (
                                                 if ($installerType -eq "inno") {
                                                     $InstallProgram = "`"$($downloadedInstaller.Filename)`" /VERYSILENT /ALLUSERS /NORESTART" #inno installer (machine)
                                                 }
-												if ($installerType -eq "burn") {
+                                                if ($installerType -eq "burn") {
                                                     $InstallProgram = "`"$($downloadedInstaller.Filename)`" /QUIET /NORESTART" #burn installer (machine)
                                                 }
                                             }
@@ -398,28 +398,28 @@ param (
                                             $DetectionRegKey = $installerdetails.UninstallRegKey                            
                                             if (($DetectionRegKey -eq "") -or ($DetectionRegKey -eq $null))
                                             {
-												if ($installerdetails.ProductCode -ne $null) #e.g. alternative method in BURN installers
-												{
-													$WindowsInstallerDetection = New-CMDetectionClauseWindowsInstaller -ProductCode $installerdetails.ProductCode -Existence
-													$DetectionClauses += $WindowsInstallerDetection
-												}
-												else
-												{
-													Write-Host "Installer seems to be `"Registry-Free`", try to use file-detection..."
-													if (($installerdetails.FileDetection -ne "") -and ($installerdetails.FileDetection -ne $null))
-													{
-														$FileToDetect = [io.path]::GetFileName($installerdetails.FileDetection)
-														$FilePathToDetect = [io.path]::GetDirectoryName($installerdetails.FileDetection)                                
-														$ExpectedFileVersion = $($installerdetails.FileDetectionVersion) -replace ",", "."                                                        
-														Write-Host "Expected FileVersion is $ExpectedFileVersion"
-														$FileDetection = New-CMDetectionClauseFile -FileName $FileToDetect -Is64Bit:$true -Path $FilePathToDetect -ExpressionOperator IsEquals -PropertyType Version -ExpectedValue $ExpectedFileVersion -Value
-														$DetectionClauses += $FileDetection
-													}
-													else
-													{
-														Write-Host "We did not found a useable file- or registry-detection in this installer. Deployment Type requires manual configuration (Detection Method)!" -ForegroundColor Red
-													}
-												}
+                                                if ($installerdetails.ProductCode -ne $null) #e.g. alternative method in BURN installers
+                                                {
+                                                    $WindowsInstallerDetection = New-CMDetectionClauseWindowsInstaller -ProductCode $installerdetails.ProductCode -Existence
+                                                    $DetectionClauses += $WindowsInstallerDetection
+                                                }
+                                                else
+                                                {
+                                                    Write-Host "Installer seems to be `"Registry-Free`", try to use file-detection..."
+                                                    if (($installerdetails.FileDetection -ne "") -and ($installerdetails.FileDetection -ne $null))
+                                                    {
+                                                        $FileToDetect = [io.path]::GetFileName($installerdetails.FileDetection)
+                                                        $FilePathToDetect = [io.path]::GetDirectoryName($installerdetails.FileDetection)                                
+                                                        $ExpectedFileVersion = $($installerdetails.FileDetectionVersion) -replace ",", "."                                                        
+                                                        Write-Host "Expected FileVersion is $ExpectedFileVersion"
+                                                        $FileDetection = New-CMDetectionClauseFile -FileName $FileToDetect -Is64Bit:$true -Path $FilePathToDetect -ExpressionOperator IsEquals -PropertyType Version -ExpectedValue $ExpectedFileVersion -Value
+                                                        $DetectionClauses += $FileDetection
+                                                    }
+                                                    else
+                                                    {
+                                                        Write-Host "We did not found a useable file- or registry-detection in this installer. Deployment Type requires manual configuration (Detection Method)!" -ForegroundColor Red
+                                                    }
+                                                }
                                             }
                                             else
                                             {
@@ -564,10 +564,10 @@ param (
     if (!(Test-Path -Path "FileSystem::$Global:7z15Beta_exe")) { Write-Host "ERROR: Please install the correct version of 7-Zip (15.05 beta, {from https://sourceforge.net/projects/sevenzip/files/7-Zip/15.05/}) before using WingetBridge Factory!" -ForegroundColor Red
         break
     }
-	$getwgm = Get-Command Get-WingetManifest -ErrorAction Ignore
-	if (!(($getwgm -ne $null) -and (($getwgm).Version -ige "1.2.0.2"))) { Write-Host "ERROR: Please install the latest version of WingetBridge (1.2.0.2 or later {from https://github.com/endpointmanager/wingetbridge-powershell}) before using WingetBridge Factory!" -ForegroundColor Red
-		break
-	}
+    $getwgm = Get-Command Get-WingetManifest -ErrorAction Ignore
+    if (!(($getwgm -ne $null) -and (($getwgm).Version -ige "1.2.0.2"))) { Write-Host "ERROR: Please install the latest version of WingetBridge (1.2.0.2 or later {from https://github.com/endpointmanager/wingetbridge-powershell}) before using WingetBridge Factory!" -ForegroundColor Red
+        break
+    }
 
     #Create the required subdirectories
     $nf = New-Item -ItemType Directory -Path "FileSystem::$ScriptDir\bin" -Force
