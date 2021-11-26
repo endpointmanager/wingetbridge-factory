@@ -1,4 +1,4 @@
-![Image of wingetbridge-factory](https://repository-images.githubusercontent.com/427951913/a71e5059-78ca-4416-97c2-165998398e14)
+![Image of wingetbridge-factory](https://repository-images.githubusercontent.com/427951913/706848a8-b502-429a-9e74-f784c526b0a5)
 [![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/PaulJezek.svg?style=social&label=Follow%20%40Paul%20Jezek%20%23wingetbridge)](https://twitter.com/PaulJezek)
 # wingetbridge-factory
 
