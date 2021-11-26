@@ -256,7 +256,6 @@ param (
                                         }
                                     }
 
-
                                     if (!($SkipInstaller))
                                     {
                                         if ((($x86InstallerFound -eq $true) -and ($x64InstallerFound -eq $true)) -or ($x64InstallerFound -eq $true)) #do not create an OS-Requirement if only a x86-installer exists (but no x64)
@@ -264,14 +263,14 @@ param (
                                             $SupportedPlatform = @()                   
                                             if ($installer.Architecture -eq "x64")
                                             {
-                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows Server 2019*(64-bit)*" -Fast | Where-Object PlatformType -eq 1
-                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(64-bit)*" -Fast | Where-Object PlatformType -eq 1
-                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(64-bit)*" -Fast | Where-Object PlatformType -eq 1
+                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows Server 2019*(64-bit)*" | Where-Object PlatformType -eq 1
+                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(64-bit)*" | Where-Object PlatformType -eq 1
+                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(64-bit)*" | Where-Object PlatformType -eq 1
                                             }
                                             if ($installer.Architecture -eq "x86")
                                             {                                                
-                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(32-bit)*" -Fast | Where-Object PlatformType -eq 1
-                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(32-bit)*" -Fast | Where-Object PlatformType -eq 1
+                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 10*(32-bit)*" | Where-Object PlatformType -eq 1
+                                                $SupportedPlatform += Get-CMConfigurationPlatform -Name "All*Windows 11*(32-bit)*" | Where-Object PlatformType -eq 1
                                             }
                                             $OSRequirements = $OperatingSystemCondition | New-CMRequirementRuleOperatingSystemValue -RuleOperator OneOf -Platform $SupportedPlatform
                                             Write-Host "Created OperatingSystem-RequirementRule (for $($installer.Architecture))"
