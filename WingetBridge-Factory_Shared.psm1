@@ -1,6 +1,6 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.7, Nov 25, 2021
+# ScriptVersion:   v1.0.8, Nov 26, 2021
 # Description:     WingetBridge Factory - Shared functions
 # Compatibility:   MSI, NULLSOFT, INNO, BURN
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory

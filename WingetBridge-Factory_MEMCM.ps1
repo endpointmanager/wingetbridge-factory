@@ -1,6 +1,6 @@
 ﻿###
 # Author:          Paul Jezek
-# ScriptVersion:   v1.0.7, Nov 25, 2021
+# ScriptVersion:   v1.0.8, Nov 26, 2021
 # Description:     WingetBridge Factory for MEMCM
 # Compatibility:   MSI, NULLSOFT, INNO, BURN
 # Please visit:    https://github.com/endpointmanager/wingetbridge-factory  - to get the latest version
@@ -176,7 +176,7 @@ param (
                             $Scope = $installer.Scope
                             if (($Scope -eq "") -or ($Scope -eq $null)) { $Scope = $manifest.Scope }
 
-                            if ($testrun)
+                            if (($testrun) -and ($i -eq 2))
                             {
                                 Write-host "Found machine targeted installer ($installerType, $($installer.Architecture)  $($installer.InstallerLocale))" -ForegroundColor Magenta
                             }                            
@@ -438,11 +438,10 @@ param (
                                                 if ($installer.Architecture -eq "x64") { $DetectionClauses += $Wow6432RegistryDetection } #as we are not able to fully decode nullsoft-script, asume it could be registered in Wow6432Node                    
                                             }
 
-
                                             if ($DetectionClauses.count -gt 1){
                                                 $DetectionClauseConnector = @()
-                                                For ($i=1; $i -lt $DetectionClauses.length; $i++) {
-                                                    $logicName = $DetectionClauses[$i].Setting.LogicalName
+                                                For ($x=1; $x -lt $DetectionClauses.length; $x++) {
+                                                    $logicName = $DetectionClauses[$x].Setting.LogicalName
                                                     $DetectionClauseConnector += @{"LogicalName"= $logicName;Connector="OR"}
                                                 }                        
                                             }
