@@ -38,6 +38,7 @@ The function "New-CMWingetBridgePackage" is the main-function of the MEMCM asume
 
 * <del>Support for INNO installers will be available within the next few weeks<del> (added in v1.06)
 * <del>Support for BURN (WIX Bootstrapper) installers should be available within the next few weeks<del> (added in v1.07)
+* Support for Windows app packages (appx, appxbundle, msix, msixbundle) should be available within the next few weeks
 * (Optional) E-Mail notification when a new software package was created
 * Automatically create supersedence (MEMCM)
 
