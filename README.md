@@ -23,7 +23,7 @@ Unfortunately, the winget repository does not provide a reliable detection-metho
 WingetBridge Factory analyze installers **on the fly** and tries to detect a reliable detection-method and extracts an icon for some installer types.
 This method will not deliver always a 100% reliable detection-method and there is room for a lot of improvements. Therefore, I recommend to verify package-creation manually (at least once per new PackageIDs added into the configuration).  
 
-The available script is intended to be used with MEMCM (formerly ConfigMgr) and only supports MSI, NULLSOFT, INNO and BURN installers at the moment. However, the MEMCM-script could be extended or even modified for different software deployment tools, depending on your own scripting-skills.
+The available script is intended to be used with MEMCM (aka ConfigMgr) and only supports MSI, NULLSOFT, INNO and BURN installers at the moment. However, the MEMCM-script could be extended or even modified for different software deployment tools, depending on your own scripting-skills.
 
 ## Risk of damage :warning:
 
